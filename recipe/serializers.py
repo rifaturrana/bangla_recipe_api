@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Recipe, RecipeCategory, RecipeLike, RecipeBookmark
+from .models import Recipe, RecipeCategory, RecipeLike
 
 
 class RecipeCategorySerializer(serializers.ModelSerializer):
@@ -61,9 +61,3 @@ class RecipeLikeSerializer(serializers.ModelSerializer):
         model = RecipeLike
         fields = ('id', 'user', 'recipe')
 
-class RecipeBookmarkSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
-
-    class Meta:
-        model = RecipeBookmark
-        fields = ('id', 'user', 'recipe')

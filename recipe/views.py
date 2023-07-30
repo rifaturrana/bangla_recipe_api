@@ -3,22 +3,33 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
-
-from .models import Recipe, RecipeLike, RecipeBookmark
+from django.contrib.auth import get_user_model
+from .models import Recipe, RecipeLike
 from .serializers import RecipeLikeSerializer, RecipeSerializer
 from .permissions import IsAuthorOrReadOnly
+
+User = get_user_model()
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def recipe_list(request):
     """
-    Get a collection of recipes.
+    Get a collection of recipes filtered by author's username.
     """
-    queryset = Recipe.objects.all()
+    author_username = request.GET.get('author__username')
+
+    if author_username:
+        try:
+            author = User.objects.get(username=author_username)
+            queryset = Recipe.objects.filter(author=author)
+        except User.DoesNotExist:
+            return Response({"message": "User not found."}, status=404)
+    else:
+        queryset = Recipe.objects.all()
+
     serializer = RecipeSerializer(queryset, many=True)
     return Response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -26,6 +37,7 @@ def recipe_create(request):
     """
     Create a recipe.
     """
+    print(request.data)
     serializer = RecipeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     serializer.save(author=request.user)
@@ -81,32 +93,7 @@ def recipe_like(request, pk):
             return Response(status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
     
-@api_view(['POST','DELETE'])
-@permission_classes([IsAuthenticated])
-def recipe_bookmark(request, pk):
-    """
-    Bookmark or unbookmark a recipe.
-    """
-    recipe = get_object_or_404(Recipe, id=pk)
 
-    if request.method == 'POST':
-        new_bookmark, created = RecipeBookmark.objects.get_or_create(user=request.user, recipe=recipe)
-        if created:
-            new_bookmark.save()
-            return Response(status=status.HTTP_201_CREATED)
-        else:
-            bookmark = RecipeBookmark.objects.filter(user=request.user, recipe=recipe)
-            if bookmark.exists():
-                bookmark.delete()
-                return Response(status=status.HTTP_200_OK)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        bookmark = RecipeBookmark.objects.filter(user=request.user, recipe=recipe)
-        if bookmark.exists():
-            bookmark.delete()
-            return Response(status=status.HTTP_200_OK)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
     
 
     

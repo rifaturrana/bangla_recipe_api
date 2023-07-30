@@ -4,11 +4,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 
 from recipe.models import Recipe
 from .models import Profile
 from recipe.serializers import RecipeSerializer
 from . import serializers
+User = get_user_model()
 
 
 @api_view(['POST'])
@@ -89,6 +91,7 @@ def user_profile_update(request):
     profile = request.user.profile
     if request.method == 'GET':
         serializer = serializers.ProfileSerializer(profile)
+        print(serializer.data)
         return Response(serializer.data)
     elif request.method == 'PUT':
         serializer = serializers.ProfileSerializer(profile, data=request.data, partial=True)
@@ -116,24 +119,48 @@ def user_avatar(request):
 
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
-def user_bookmarks(request):
+def user_bookmarks(request, pk):
+    """
+    Get, Create, Delete favorite recipe
+    """
+    profile = Profile.objects.all()
+
+    if request.method == 'GET':
+        user = User.objects.get(id=pk)
+
+        user_profile = get_object_or_404(profile, user=user)
+        print(user_profile)
+        serializer = RecipeSerializer(user_profile.bookmarks.all(), many=True)
+        print(serializer)
+        print(user_profile.bookmarks)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        user = User.objects.get(id=pk)
+        print(user)
+        user_profile = get_object_or_404(profile, user=user)
+        print(user_profile)
+        recipe = Recipe.objects.get(id=request.data['id'])
+        print(recipe)
+        if user_profile:
+            user_profile.bookmarks.add(recipe)
+            user_profile.save()
+            recipe.save()
+            return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        user = User.objects.get(id=pk)
+        user_profile = get_object_or_404(profile, user=user)
+        recipe = Recipe.objects.get(id=request.data['id'])
+        if user_profile:
+            user_profile.bookmarks.remove(recipe)
+            return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
     """
     API view to get, create, and delete favorite recipes.
     """
-    user = request.user
-    user_profile = get_object_or_404(Profile, user=user)
-    if request.method == 'GET':
-        serializer = RecipeSerializer(user_profile.bookmarks.all(), many=True)
-        return Response(serializer.data)
-    elif request.method == 'POST':
-        recipe = Recipe.objects.get(id=request.data['id'])
-        print(recipe)
-        user_profile.bookmarks.add(recipe)
-        return Response(status=status.HTTP_200_OK)
-    elif request.method == 'DELETE':
-        recipe = Recipe.objects.get(id=request.data['id'])
-        user_profile.bookmarks.remove(recipe)
-        return Response(status=status.HTTP_200_OK)
+  
 
 
 @api_view(['PUT'])
